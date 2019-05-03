@@ -45,7 +45,7 @@ class TrainData_template(TrainData):
         
         self.nsamples=len(feature_array)
         
-        self.x=[] # list of feature numpy arrays
+        self.x=[feature_array['bin_x_1']] # list of feature numpy arrays
         self.y=[] # list of target numpy arrays (truth)
         self.w=[] # list of weight arrays. One for each truth target
 

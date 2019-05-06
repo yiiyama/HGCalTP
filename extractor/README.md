@@ -24,4 +24,4 @@ Output files are named by HTCondor job ids.
 Extractor macros
 ================
 
-As we agreed to start with classification of predefined clusters, the only extractor macros currently provided (`clusters.cc` and `clusters_binned.cc`) take the HGCalTriggerNtuples, which is an event-wise (one event per entry) tree, and make a cluster-wise (one cluster per entry) tree. The macros should be straightforward (dumb) enough to be modified according to needs.
+As we agreed to start with classification of predefined clusters, the only extractor macro currently provided (`clusters.cc`) takes the HGCalTriggerNtuples, which is an event-wise (one event per entry) tree, and make a cluster-wise (one cluster per entry) tree. The macros should be straightforward (dumb) enough to be modified according to needs.

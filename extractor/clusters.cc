@@ -12,7 +12,7 @@
 template<class V>
 class InputPtr {
 public:
-  InputPtr() : up_(std::make_unique<V>()), addr_(up_.get()) {}
+  InputPtr() : up_(std::unique_ptr<V>(new V())), addr_(up_.get()) {}
   V** addr() { return &addr_; }
   V& operator*() { return *up_; }
   V* operator->() { return up_.get(); }
@@ -500,7 +500,9 @@ extractNtuples(TTree* _input, char const* _outputFileName, long _nEntries = -1)
         unsigned ibin(iZ * nBinsThetaPhi * nBinsThetaPhi + iTheta * nBinsThetaPhi + iPhi);
         // there can be at most three hits per bin
         while (ibin < maxBinsFeatures) {
-          if (bin_id[ibin] != 0)
+          if (bin_id[ibin] == 0)
+            break;
+          else
             ibin += nBins;
         }
         if (ibin >= maxBinsFeatures)

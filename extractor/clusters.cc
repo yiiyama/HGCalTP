@@ -101,7 +101,8 @@ extractNtuples(TTree* _input, char const* _outputFileName, long _nEntries = -1)
   int bin_wafer[maxBinsFeatures]; // 15
   int bin_wafertype[maxBinsFeatures]; // 16
 
-  unsigned const nBinFeatures(17 * maxHitsPerBin);
+  unsigned const nFeatures(17);
+  unsigned const nBinFeatures(nFeatures * maxHitsPerBin);
   // concatenated version (layer, theta, phi, features)
   std::vector<std::vector<std::vector<std::vector<float>>>> binned_features;
   binned_features.resize(nBinsZ);
@@ -539,8 +540,13 @@ extractNtuples(TTree* _input, char const* _outputFileName, long _nEntries = -1)
       for (unsigned iZ(0); iZ != nBinsZ; ++iZ) {
         for (unsigned iTheta(0); iTheta != nBinsThetaPhi; ++iTheta) {
           for (unsigned iPhi(0); iPhi != nBinsThetaPhi; ++iPhi) {
-            unsigned ibin(iZ * nBinsThetaPhi * nBinsThetaPhi + iTheta * nBinsThetaPhi + iPhi);
-            binned_features[iZ][iTheta][iPhi].assign({
+            auto& features(binned_features[iZ][iTheta][iPhi]);
+            features.clear();
+            
+            for (unsigned iHit(0); iHit != maxHitsPerBin; ++iHit) {
+              unsigned ibin(iZ * nBinsThetaPhi * nBinsThetaPhi + iTheta * nBinsThetaPhi + iPhi + iHit * nBins);
+            
+              features.insert(features.begin() + iHit * nFeatures, {
                 float(bin_id[ibin]),
                 bin_eta[ibin],
                 bin_theta[ibin],
@@ -558,7 +564,8 @@ extractNtuples(TTree* _input, char const* _outputFileName, long _nEntries = -1)
                 float(bin_layer[ibin]),
                 float(bin_wafer[ibin]),
                 float(bin_wafertype[ibin])
-            });
+              });
+            }
           }
         }
       }

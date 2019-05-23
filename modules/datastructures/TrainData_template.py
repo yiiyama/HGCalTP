@@ -39,6 +39,8 @@ class TrainData_ID(TrainData):
         
         fileTimeOut(filename,120)
         
+        from DeepJetCore.preprocessing import read2DArray
+        
         # user code
         feature_array = read2DArray(filename,self.treename,"binned_features",self.nsamples,32,32)
         truth = self.read_truthclasses(filename)

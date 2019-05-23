@@ -43,10 +43,10 @@ class TrainData_ID(TrainData):
         tree = rfile.Get(self.treename)
         self.nsamples=tree.GetEntries()
         
-        from DeepJetCore.preprocessing import read2DArray
+        from DeepJetCore.preprocessing import read4DArray
         
         # user code
-        feature_array = read2DArray(filename,self.treename,"binned_features",self.nsamples,32,32)
+        feature_array = read4DArray(filename,self.treename,"binned_features",self.nsamples,38,5,5,51)
         truth = self.read_truthclasses(filename)
         
         notremoves=weighter.createNotRemoveIndices(Tuple)

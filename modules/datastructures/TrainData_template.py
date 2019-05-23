@@ -38,6 +38,11 @@ class TrainData_ID(TrainData):
         # options are not yet described here
         
         fileTimeOut(filename,120)
+        import ROOT
+        fileTimeOut(filename,120) #give eos a minute to recover
+        rfile = ROOT.TFile(filename)
+        tree = rfile.Get("tree")
+        self.nsamples=tree.GetEntries()
         
         from DeepJetCore.preprocessing import read2DArray
         

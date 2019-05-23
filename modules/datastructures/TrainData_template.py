@@ -39,7 +39,6 @@ class TrainData_ID(TrainData):
         
         fileTimeOut(filename,120)
         import ROOT
-        fileTimeOut(filename,120) #give eos a minute to recover
         rfile = ROOT.TFile(filename)
         tree = rfile.Get(self.treename)
         self.nsamples=tree.GetEntries()

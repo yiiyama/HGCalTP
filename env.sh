@@ -6,17 +6,8 @@ export DEEPJETCORE_SUBPACKAGE=$HGCALTP
 
 
 #adapt this and then remove the exit
-echo adapt this to your DeepJetCore installation!! cd /afs/cern.ch/user/j/jkiesele/work/TESTDJ/DeepJetCore
-exit
-
-
-
-if command -v nvidia-smi > /dev/null
-then
-        source gpu_env.sh
-else
-        source lxplus_env.sh
-fi
+cd /afs/cern.ch/user/j/jkiesele/work/TESTDJ/DeepJetCore
+source env.sh
 cd $HGCALTP
 export PYTHONPATH=$HGCALTP/modules:$PYTHONPATH
 export PYTHONPATH=$HGCALTP/modules/datastructures:$PYTHONPATH

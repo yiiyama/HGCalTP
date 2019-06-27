@@ -31,6 +31,14 @@ class TrainData_ID(TrainData):
         #call this at the end
         self.reduceTruth(None)
 
+    #not needed, override
+    def produceBinWeighter(self, filename):
+        return self.make_empty_weighter()
+    
+    def produceMeansFromRootFile(self, orig_list, limit):
+        import numpy
+        return numpy.array([1.,])
+
 
     def readFromRootFile(self,filename,TupleMeanStd, weighter):
 

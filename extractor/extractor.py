@@ -9,6 +9,8 @@ from argparse import ArgumentParser
 
 MACRO = 'clusters'
 
+thisdir = os.path.dirname(os.path.realpath(__file__))
+
 arg_parser = ArgumentParser(description = 'Run simple jobs on condor')
 arg_parser.add_argument('--in', '-i', metavar='PATH', dest='in_path', nargs='+', default=[], help='Input files.')
 arg_parser.add_argument('--in-list', '-I', metavar='PATH', dest='in_list', help='File with a list of input files, one file per line.')
@@ -17,8 +19,9 @@ arg_parser.add_argument('--batch', '-b', metavar='JOBFLAVOUR', dest='job_flavour
 arg_parser.add_argument('--cmst3', '-M', action = 'store_true', dest = 'cmst3', help = 'Use CMG accounting group for HTCondor.')
 arg_parser.add_argument('--files-per-job', '-f', metavar='N', dest='files_per_job', default=1, type=int, help='Number of files per job.')
 arg_parser.add_argument('--num-events', '-n', metavar='N', dest='num_events', default=-1, type=int, help='Number of events to process.')
+arg_parser.add_argument('--min-pt', '-p', metavar='VAL', dest='min_pt', default=0., type=float, help='Minimum cluster pT.')
 arg_parser.add_argument('--no-compile', '-C', action='store_true', dest='no_compile', help='Do not compile the ROOT macro.')
-arg_parser.add_argument('--script-dir', '-d', metavar='PATH', dest='script_dir', default=os.path.dirname(os.path.realpath(__file__)), help='(Internal use) Location of the script.')
+arg_parser.add_argument('--script-dir', '-d', metavar='PATH', dest='script_dir', default=thisdir, help='(Internal use) Location of the script.')
 
 args = arg_parser.parse_args()
 sys.argv = []
@@ -62,7 +65,7 @@ if args.job_flavour is not None:
         accounting_group = 'group_u_CMS.u_zh'
 
     jdl = []
-    jdl.append(('executable', __file__))
+    jdl.append(('executable', '%s/setenv_exec.sh' % thisdir))
     jdl.append(('universe', 'vanilla'))
     jdl.append(('should_transfer_files', 'YES'))
     jdl.append(('input', '/dev/null'))
@@ -75,7 +78,7 @@ if args.job_flavour is not None:
     jdl.append(('log', '%s/$(Cluster).$(Process).log' % logdir))
     jdl.append(('output', '%s/$(Cluster).$(Process).out' % logdir))
     jdl.append(('error', '%s/$(Cluster).$(Process).err' % logdir))
-    jdl.append(('arguments', '--no-compile --in $(InFile) --out %s/$(Cluster)_$(Process).root --script-dir %s' % (args.out_path, args.script_dir)))
+    jdl.append(('arguments', '%s --no-compile --in $(InFile) --out %s/$(Cluster)_$(Process).root --min-pt %f --script-dir %s' % (os.path.realpath(__file__), args.out_path, args.min_pt, args.script_dir)))
 
     jdl_text = ''.join(['%s = %s\n' % (key, str(value)) for key, value in jdl])
     jdl_text += 'queue 1 InFile from (\n'
@@ -105,7 +108,7 @@ else:
     tmp = tempfile.NamedTemporaryFile(suffix='.root', delete=False)
     tmp.close()
 
-    ROOT.extractNtuples(tree, tmp.name, args.num_events)
+    ROOT.extractNtuples(tree, tmp.name, args.min_pt, args.num_events)
 
     shutil.copyfile(tmp.name, args.out_path)
     os.unlink(tmp.name)

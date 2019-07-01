@@ -23,7 +23,7 @@ private:
 };
 
 void
-extractNtuples(TTree* _input, char const* _outputFileName, long _nEntries = -1)
+extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., long _nEntries = -1)
 {
   auto* outputFile(TFile::Open(_outputFileName, "recreate"));
   auto* output(new TTree("clusters", "HGC TP clusters"));
@@ -304,6 +304,9 @@ extractNtuples(TTree* _input, char const* _outputFileName, long _nEntries = -1)
       if (absPid == 0 || absPid > 1000000000)
         continue;
 
+      if ((*cl3d_pt)[iC] < _minPt)
+        continue;
+
       cluster_pt = (*cl3d_pt)[iC];
       cluster_eta = std::abs((*cl3d_eta)[iC]);
       cluster_phi = (*cl3d_phi)[iC];
@@ -578,3 +581,13 @@ extractNtuples(TTree* _input, char const* _outputFileName, long _nEntries = -1)
   output->Write();
   delete outputFile;
 }
+
+#ifdef __CLING__
+#pragma link off all globals;
+#pragma link off all classes;
+#pragma link off all functions;
+#pragma link C++ nestedclass;
+#pragma link C++ nestedtypedef;
+
+#pragma link C++ class std::vector<std::vector<std::vector<std::vector<float>>>>+;
+#endif

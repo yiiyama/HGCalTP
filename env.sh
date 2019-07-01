@@ -1,4 +1,3 @@
-
 #! /bin/bash
 THISDIR=`pwd`
 export HGCALTP=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd -P)

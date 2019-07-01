@@ -1,3 +1,4 @@
+
 #Make it look like a package
 from glob import glob
 from os import environ
@@ -18,3 +19,4 @@ for module_name in modules:
         locals( )[model_name] = model
         __all__.append(model_name)
         structure_list.append(model_name)
+

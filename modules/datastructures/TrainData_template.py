@@ -1,7 +1,8 @@
+
 from DeepJetCore.TrainData import TrainData, fileTimeOut
 import numpy
 
-class TrainData_template(TrainData):
+class TrainData_ID(TrainData):
     def __init__(self):
         TrainData.__init__(self)
 
@@ -25,6 +26,7 @@ class TrainData_template(TrainData):
         self.registerBranches(['cluster_energy','cluster_eta']) #list of branches to be used
 
         self.registerBranches(self.truthclasses)
+
 
         #call this at the end
         self.reduceTruth(None)
@@ -63,12 +65,12 @@ class TrainData_template(TrainData):
         Tuple = self.readTreeFromRootToTuple(filename)
 
         print("creating remove indxs")
-
         notremoves=weighter.createNotRemoveIndices(Tuple)
 
         # this removes parts of the dataset for weighting the events
-        feature_array = feature_array[notremoves > 0]
-                
+        if self.remove:
+            feature_array = feature_array[notremoves > 0]
+            truth = truth[notremoves > 0]
         # call this in the end
 
         self.nsamples=len(feature_array)

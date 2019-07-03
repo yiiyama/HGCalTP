@@ -3,6 +3,7 @@
 #include "TVector2.h"
 
 #include <vector>
+#include <array>
 #include <memory>
 #include <cmath>
 #include <unordered_map>
@@ -28,15 +29,11 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
   auto* outputFile(TFile::Open(_outputFileName, "recreate"));
   auto* output(new TTree("clusters", "HGC TP clusters"));
 
-  typedef std::vector<float> VFloat;
-  typedef std::vector<int> VInt;
-  typedef std::vector<uint32_t> VID;
-
-  unsigned const nBinsThetaPhi(5);
-  unsigned const nBinsZ(38);
-  unsigned const nBins(nBinsThetaPhi * nBinsThetaPhi * nBinsZ);
-  unsigned const maxHitsPerBin(3);
-  unsigned const maxBinsFeatures(nBins * maxHitsPerBin);
+  constexpr unsigned nBinsThetaPhi(5);
+  constexpr unsigned nBinsZ(38);
+  constexpr unsigned nBins(nBinsThetaPhi * nBinsThetaPhi * nBinsZ);
+  constexpr unsigned maxHitsPerBin(3);
+  constexpr unsigned long maxHitsPerCluster(250);
 
   enum Category {
     kElectron,
@@ -56,6 +53,9 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
     "neutral",
     "charged"
   };
+
+  // one-hot labels
+  int truth_labels[nCategories];
 
   float cluster_pt;
   float cluster_eta;
@@ -82,57 +82,43 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
   float cluster_truth_eta;
   float cluster_truth_phi;
   float cluster_truth_energy;
-  // make arrays - size 5 x 5 x 38 x 3
-  uint32_t bin_id[maxBinsFeatures]; // 0
-  float bin_eta[maxBinsFeatures]; // 1
-  float bin_theta[maxBinsFeatures]; // 2
-  float bin_phi[maxBinsFeatures]; // 3
-  float bin_x[maxBinsFeatures]; // 4
-  float bin_y[maxBinsFeatures]; // 5
-  float bin_eta_global[maxBinsFeatures]; // 6
-  float bin_theta_global[maxBinsFeatures]; // 7
-  float bin_phi_global[maxBinsFeatures]; // 8
-  float bin_dist_global[maxBinsFeatures]; // 9
-  float bin_x_global[maxBinsFeatures]; // 10
-  float bin_y_global[maxBinsFeatures]; // 11
-  float bin_z_global[maxBinsFeatures]; // 12
-  float bin_energy[maxBinsFeatures]; // 13
-  int bin_layer[maxBinsFeatures]; // 14
-  int bin_wafer[maxBinsFeatures]; // 15
-  int bin_wafertype[maxBinsFeatures]; // 16
-
-  unsigned const nFeatures(17);
-  unsigned const nBinFeatures(nFeatures * maxHitsPerBin);
-  // concatenated version (layer, theta, phi, features)
-  std::vector<std::vector<std::vector<std::vector<float>>>> binned_features;
-  binned_features.resize(nBinsZ);
-  for (auto& vz : binned_features) {
-    vz.resize(nBinsThetaPhi);
-    for (auto& vt : vz) {
-      vt.resize(nBinsThetaPhi);
-      for (auto& vp : vt)
-        vp.assign(nBinFeatures, 0.);
-    }
-  }
-
+  // arrays for binned CNN - size 5 x 5 x 38 x 3
+  uint32_t bin_id[maxHitsPerBin][nBins]; // 0
+  float bin_eta[maxHitsPerBin][nBins]; // 1
+  float bin_theta[maxHitsPerBin][nBins]; // 2
+  float bin_phi[maxHitsPerBin][nBins]; // 3
+  float bin_x[maxHitsPerBin][nBins]; // 4
+  float bin_y[maxHitsPerBin][nBins]; // 5
+  float bin_eta_global[maxHitsPerBin][nBins]; // 6
+  float bin_theta_global[maxHitsPerBin][nBins]; // 7
+  float bin_phi_global[maxHitsPerBin][nBins]; // 8
+  float bin_dist_global[maxHitsPerBin][nBins]; // 9
+  float bin_x_global[maxHitsPerBin][nBins]; // 10
+  float bin_y_global[maxHitsPerBin][nBins]; // 11
+  float bin_z_global[maxHitsPerBin][nBins]; // 12
+  float bin_energy[maxHitsPerBin][nBins]; // 13
+  int bin_layer[maxHitsPerBin][nBins]; // 14
+  int bin_wafer[maxHitsPerBin][nBins]; // 15
+  int bin_wafertype[maxHitsPerBin][nBins]; // 16
+  // arrays for graph NN - maximum 250 hits
   int n_cell;
-  VID cell_id;
-  VInt cell_layer;
-  VFloat cell_x;
-  VFloat cell_y;
-  VFloat cell_z;
-  VFloat cell_r;
-  VFloat cell_eta;
-  VFloat cell_theta;
-  VFloat cell_phi;
-  VFloat cell_dist;
-  VFloat cell_energy;
-  VInt cell_wafer;
-  VInt cell_wafertype;
-  VInt cell_primary;
-  // concatenated version
-  std::vector<std::vector<float>> cell_features;
-  int truth_labels[nCategories];
+  uint32_t cell_id[maxHitsPerCluster];
+  int cell_layer[maxHitsPerCluster];
+  float cell_x[maxHitsPerCluster];
+  float cell_y[maxHitsPerCluster];
+  float cell_z[maxHitsPerCluster];
+  float cell_r[maxHitsPerCluster];
+  float cell_eta[maxHitsPerCluster];
+  float cell_theta[maxHitsPerCluster];
+  float cell_phi[maxHitsPerCluster];
+  float cell_dist[maxHitsPerCluster];
+  float cell_energy[maxHitsPerCluster];
+  int cell_wafer[maxHitsPerCluster];
+  int cell_wafertype[maxHitsPerCluster];
+  int cell_primary[maxHitsPerCluster];
+
+  for (unsigned iC(0); iC != nCategories; ++iC)
+    output->Branch(categories[iC], &(truth_labels[iC]), categories[iC] + "/I");
 
   output->Branch("cluster_pt", &cluster_pt, "cluster_pt/F");
   output->Branch("cluster_eta", &cluster_eta, "cluster_eta/F");
@@ -160,49 +146,51 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
   output->Branch("cluster_truth_phi", &cluster_truth_phi, "cluster_truth_phi/F");
   output->Branch("cluster_truth_energy", &cluster_truth_energy, "cluster_truth_energy/F");
 
-  TString arrdef(TString::Format("[%d]", nBins));
+  auto arrdef(TString::Format("[%d]", nBins));
   for (unsigned iHit(0); iHit != maxHitsPerBin; ++iHit) {
-    TString suffix(TString::Format("_%d", iHit));
-    output->Branch("bin_id" + suffix, bin_id, "bin_id" + suffix + arrdef + "/i");
-    output->Branch("bin_eta" + suffix, bin_eta, "bin_eta" + suffix + arrdef + "/F");
-    output->Branch("bin_theta" + suffix, bin_theta, "bin_theta" + suffix + arrdef + "/F");
-    output->Branch("bin_phi" + suffix, bin_phi, "bin_phi" + suffix + arrdef + "/F");
-    output->Branch("bin_x" + suffix, bin_x, "bin_x" + suffix + arrdef + "/F");
-    output->Branch("bin_y" + suffix, bin_y, "bin_y" + suffix + arrdef + "/F");
-    output->Branch("bin_eta_global" + suffix, bin_eta_global, "bin_eta_global" + suffix + arrdef + "/F");
-    output->Branch("bin_theta_global" + suffix, bin_theta_global, "bin_theta_global" + suffix + arrdef + "/F");
-    output->Branch("bin_phi_global" + suffix, bin_phi_global, "bin_phi_global" + suffix + arrdef + "/F");
-    output->Branch("bin_dist_global" + suffix, bin_dist_global, "bin_dist_global" + suffix + arrdef + "/F");
-    output->Branch("bin_x_global" + suffix, bin_x_global, "bin_x_global" + suffix + arrdef + "/F");
-    output->Branch("bin_y_global" + suffix, bin_y_global, "bin_y_global" + suffix + arrdef + "/F");
-    output->Branch("bin_z_global" + suffix, bin_z_global, "bin_z_global" + suffix + arrdef + "/F");
-    output->Branch("bin_energy" + suffix, bin_energy, "bin_energy" + suffix + arrdef + "/F");
-    output->Branch("bin_layer" + suffix, bin_layer, "bin_layer" + suffix + arrdef + "/I");
-    output->Branch("bin_wafer" + suffix, bin_wafer, "bin_wafer" + suffix + arrdef + "/I");
-    output->Branch("bin_wafertype" + suffix, bin_wafertype, "bin_wafertype" + suffix + arrdef + "/I");
+    auto suffix(TString::Format("_%d", iHit));
+    output->Branch("bin_id" + suffix, bin_id[iHit], "bin_id" + suffix + arrdef + "/i");
+    output->Branch("bin_eta" + suffix, bin_eta[iHit], "bin_eta" + suffix + arrdef + "/F");
+    output->Branch("bin_theta" + suffix, bin_theta[iHit], "bin_theta" + suffix + arrdef + "/F");
+    output->Branch("bin_phi" + suffix, bin_phi[iHit], "bin_phi" + suffix + arrdef + "/F");
+    output->Branch("bin_x" + suffix, bin_x[iHit], "bin_x" + suffix + arrdef + "/F");
+    output->Branch("bin_y" + suffix, bin_y[iHit], "bin_y" + suffix + arrdef + "/F");
+    output->Branch("bin_eta_global" + suffix, bin_eta_global[iHit], "bin_eta_global" + suffix + arrdef + "/F");
+    output->Branch("bin_theta_global" + suffix, bin_theta_global[iHit], "bin_theta_global" + suffix + arrdef + "/F");
+    output->Branch("bin_phi_global" + suffix, bin_phi_global[iHit], "bin_phi_global" + suffix + arrdef + "/F");
+    output->Branch("bin_dist_global" + suffix, bin_dist_global[iHit], "bin_dist_global" + suffix + arrdef + "/F");
+    output->Branch("bin_x_global" + suffix, bin_x_global[iHit], "bin_x_global" + suffix + arrdef + "/F");
+    output->Branch("bin_y_global" + suffix, bin_y_global[iHit], "bin_y_global" + suffix + arrdef + "/F");
+    output->Branch("bin_z_global" + suffix, bin_z_global[iHit], "bin_z_global" + suffix + arrdef + "/F");
+    output->Branch("bin_energy" + suffix, bin_energy[iHit], "bin_energy" + suffix + arrdef + "/F");
+    output->Branch("bin_layer" + suffix, bin_layer[iHit], "bin_layer" + suffix + arrdef + "/I");
+    output->Branch("bin_wafer" + suffix, bin_wafer[iHit], "bin_wafer" + suffix + arrdef + "/I");
+    output->Branch("bin_wafertype" + suffix, bin_wafertype[iHit], "bin_wafertype" + suffix + arrdef + "/I");
   }
 
-  output->Branch("binned_features", &binned_features);
+  arrdef = TString::Format("[%lu]", maxHitsPerCluster);
+
   output->Branch("n_cell", &n_cell, "n_cell/I");
-  output->Branch("cell_id", &cell_id);
-  output->Branch("cell_layer", &cell_layer);
-  output->Branch("cell_x", &cell_x);
-  output->Branch("cell_y", &cell_y);
-  output->Branch("cell_z", &cell_z);
-  output->Branch("cell_r", &cell_r);
-  output->Branch("cell_eta", &cell_eta);
-  output->Branch("cell_theta", &cell_theta);
-  output->Branch("cell_phi", &cell_phi);
-  output->Branch("cell_dist", &cell_dist);
-  output->Branch("cell_energy", &cell_energy);
-  output->Branch("cell_wafer", &cell_wafer);
-  output->Branch("cell_wafertype", &cell_wafertype);
-  output->Branch("cell_primary", &cell_primary);
-  output->Branch("cell_features", &cell_features);
-  for (unsigned iC(0); iC != nCategories; ++iC)
-    output->Branch(categories[iC], &(truth_labels[iC]), categories[iC] + "/I");
+  output->Branch("cell_id", cell_id, "cell_id" + arrdef + "/i");
+  output->Branch("cell_layer", cell_layer, "cell_layer" + arrdef + "/I");
+  output->Branch("cell_x", cell_x, "cell_x" + arrdef + "/F");
+  output->Branch("cell_y", cell_y, "cell_y" + arrdef + "/F");
+  output->Branch("cell_z", cell_z, "cell_z" + arrdef + "/F");
+  output->Branch("cell_r", cell_r, "cell_r" + arrdef + "/F");
+  output->Branch("cell_eta", cell_eta, "cell_eta" + arrdef + "/F");
+  output->Branch("cell_theta", cell_theta, "cell_theta" + arrdef + "/F");
+  output->Branch("cell_phi", cell_phi, "cell_phi" + arrdef + "/F");
+  output->Branch("cell_dist", cell_dist, "cell_dist" + arrdef + "/F");
+  output->Branch("cell_energy", cell_energy, "cell_energy" + arrdef + "/F");
+  output->Branch("cell_wafer", cell_wafer, "cell_wafer" + arrdef + "/I");
+  output->Branch("cell_wafertype", cell_wafertype, "cell_wafertype" + arrdef + "/I");
+  output->Branch("cell_primary", cell_primary, "cell_primary" + arrdef + "/I");
 
   _input->SetBranchStatus("*", false);
+
+  typedef std::vector<float> VFloat;
+  typedef std::vector<int> VInt;
+  typedef std::vector<uint32_t> VID;
 
   InputPtr<VFloat> cl3d_pt;
   InputPtr<VFloat> cl3d_energy;
@@ -271,8 +259,8 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
   if (_input->GetBranch("tc_genparticle_index") != nullptr)
     _input->SetBranchAddress("tc_genparticle_index", tc_genparticle_index.addr());
 
-  double const zLayer1(319.81497);
-  double const thetaPhiRangeMax(0.2); // arbitrary choosing 0.2x0.2 as the theta-phi bounding box
+  constexpr double zLayer1(319.81497);
+  constexpr double thetaPhiRangeMax(0.2); // arbitrary choosing 0.2x0.2 as the theta-phi bounding box
 
   double thetaPhiBoundaries[nBinsThetaPhi + 1];
   for (unsigned iB(0); iB <= nBinsThetaPhi; ++iB)
@@ -374,50 +362,63 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
         break;
       }
 
-      std::fill_n(bin_id, maxBinsFeatures, 0);
-      std::fill_n(bin_eta, maxBinsFeatures, 0.);
-      std::fill_n(bin_theta, maxBinsFeatures, 0.);
-      std::fill_n(bin_phi, maxBinsFeatures, 0.);
-      std::fill_n(bin_x, maxBinsFeatures, 0.);
-      std::fill_n(bin_y, maxBinsFeatures, 0.);
-      std::fill_n(bin_eta_global, maxBinsFeatures, 0.);
-      std::fill_n(bin_theta_global, maxBinsFeatures, 0.);
-      std::fill_n(bin_phi_global, maxBinsFeatures, 0.);
-      std::fill_n(bin_dist_global, maxBinsFeatures, 0.);
-      std::fill_n(bin_x_global, maxBinsFeatures, 0.);
-      std::fill_n(bin_y_global, maxBinsFeatures, 0.);
-      std::fill_n(bin_z_global, maxBinsFeatures, 0.);
-      std::fill_n(bin_energy, maxBinsFeatures, 0.);
-      std::fill_n(bin_layer, maxBinsFeatures, 0);
-      std::fill_n(bin_wafer, maxBinsFeatures, 0);
-      std::fill_n(bin_wafertype, maxBinsFeatures, 0);
+      for (unsigned iHit(0); iHit != maxHitsPerBin; ++iHit) {
+        std::fill_n(bin_id[iHit], nBins, 0);
+        std::fill_n(bin_eta[iHit], nBins, 0.);
+        std::fill_n(bin_theta[iHit], nBins, 0.);
+        std::fill_n(bin_phi[iHit], nBins, 0.);
+        std::fill_n(bin_x[iHit], nBins, 0.);
+        std::fill_n(bin_y[iHit], nBins, 0.);
+        std::fill_n(bin_eta_global[iHit], nBins, 0.);
+        std::fill_n(bin_theta_global[iHit], nBins, 0.);
+        std::fill_n(bin_phi_global[iHit], nBins, 0.);
+        std::fill_n(bin_dist_global[iHit], nBins, 0.);
+        std::fill_n(bin_x_global[iHit], nBins, 0.);
+        std::fill_n(bin_y_global[iHit], nBins, 0.);
+        std::fill_n(bin_z_global[iHit], nBins, 0.);
+        std::fill_n(bin_energy[iHit], nBins, 0.);
+        std::fill_n(bin_layer[iHit], nBins, 0);
+        std::fill_n(bin_wafer[iHit], nBins, 0);
+        std::fill_n(bin_wafertype[iHit], nBins, 0);
+      }
 
       auto& constituents((*cl3d_clusters_id)[iC]);
 
-      n_cell = constituents.size();
-      cell_id.resize(constituents.size());
-      cell_layer.resize(constituents.size());
-      cell_x.resize(constituents.size());
-      cell_y.resize(constituents.size());
-      cell_z.resize(constituents.size());
-      cell_r.resize(constituents.size());
-      cell_eta.resize(constituents.size());
-      cell_theta.resize(constituents.size());
-      cell_phi.resize(constituents.size());
-      cell_dist.resize(constituents.size());
-      cell_energy.resize(constituents.size());
-      cell_wafer.resize(constituents.size());
-      cell_wafertype.resize(constituents.size());
-      cell_primary.resize(constituents.size());
-      cell_features.clear();
+      n_cell = std::min(constituents.size(), maxHitsPerCluster);
+
+      std::fill_n(cell_id, maxHitsPerCluster, 0);
+      std::fill_n(cell_layer, maxHitsPerCluster, 0);
+      std::fill_n(cell_x, maxHitsPerCluster, 0.);
+      std::fill_n(cell_y, maxHitsPerCluster, 0.);
+      std::fill_n(cell_z, maxHitsPerCluster, 0.);
+      std::fill_n(cell_r, maxHitsPerCluster, 0.);
+      std::fill_n(cell_eta, maxHitsPerCluster, 0.);
+      std::fill_n(cell_theta, maxHitsPerCluster, 0.);
+      std::fill_n(cell_phi, maxHitsPerCluster, 0.);
+      std::fill_n(cell_dist, maxHitsPerCluster, 0.);
+      std::fill_n(cell_energy, maxHitsPerCluster, 0.);
+      std::fill_n(cell_wafer, maxHitsPerCluster, 0);
+      std::fill_n(cell_wafertype, maxHitsPerCluster, 0);
+      std::fill_n(cell_primary, maxHitsPerCluster, 0);
 
       double thetaMin(3.2);
       double thetaMax(0.);
       double phiMin(3.2);
       double phiMax(-3.2);
 
-      for (unsigned iD(0); iD != constituents.size(); ++iD) {
-        unsigned iT(cellMap.at(constituents[iD]));
+      std::map<double, int> sortedIndices;
+      for (auto iS : constituents) {
+        unsigned iT(cellMap.at(iS));
+        sortedIndices.emplace((*tc_energy)[iT], iT);
+      }
+
+      unsigned iD(0);
+      auto rEnd(sortedIndices.rend());
+      for (auto rItr(sortedIndices.rbegin()); rItr != rEnd; ++rItr, ++iD) {
+        if (int(iD) == n_cell) // hit maximum
+          break;
+        
+        unsigned iT(rItr->second);
 
         double x((*tc_x)[iT]);
         double y((*tc_y)[iT]);
@@ -442,23 +443,6 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
         cell_wafertype[iD] = (*tc_wafertype)[iT];
         if (!tc_genparticle_index->empty())
           cell_primary[iD] = ((*tc_genparticle_index)[iT] >= 0);
-
-        cell_features.push_back({
-            float(cell_id[iD]),
-            float(cell_layer[iD]),
-            cell_x[iD],
-            cell_y[iD],
-            cell_z[iD],
-            cell_r[iD],
-            cell_eta[iD],
-            cell_theta[iD],
-            cell_phi[iD],
-            cell_dist[iD],
-            cell_energy[iD],
-            float(cell_wafer[iD]),
-            float(cell_wafertype[iD]),
-            float(cell_primary[iD])
-        });
 
         double relPhi(TVector2::Phi_mpi_pi(phi - cluster_phi));
 
@@ -501,15 +485,16 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
         else
           iZ -= 15;
 
+        unsigned ihit(0);
         unsigned ibin(iZ * nBinsThetaPhi * nBinsThetaPhi + iTheta * nBinsThetaPhi + iPhi);
         // there can be at most three hits per bin
-        while (ibin < maxBinsFeatures) {
-          if (bin_id[ibin] == 0)
+        while (ihit < maxHitsPerCluster) {
+          if (bin_id[ihit][ibin] == 0)
             break;
           else
-            ibin += nBins;
+            ++ihit;
         }
-        if (ibin >= maxBinsFeatures)
+        if (ihit == maxHitsPerCluster)
           continue; // discard overflow hit
 
         double thetaBinCenter(thetaCenter + thetaPhiCenters[iTheta]);
@@ -521,56 +506,23 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
 
         double eta(std::asinh(z / r));
 
-        bin_id[ibin] = (*tc_id)[iT];
-        bin_eta[ibin] = eta - etaBinCenter;
-        bin_theta[ibin] = theta - thetaBinCenter;
-        bin_phi[ibin] = TVector2::Phi_mpi_pi(phi - phiBinCenter);
-        bin_x[ibin] = x - xBinCenter;
-        bin_y[ibin] = y - yBinCenter;
-        bin_eta_global[ibin] = eta;
-        bin_theta_global[ibin] = theta;
-        bin_phi_global[ibin] = phi;
-        bin_dist_global[ibin] = std::sqrt(r * r + z * z);
-        bin_x_global[ibin] = x;
-        bin_y_global[ibin] = y;
-        bin_z_global[ibin] = z;
-        bin_layer[ibin] = iZ;
-        bin_energy[ibin] = (*tc_energy)[iT];
-        bin_wafer[ibin] = (*tc_wafer)[iT];
-        bin_wafertype[ibin] = (*tc_wafertype)[iT];
-      }
-
-      for (unsigned iZ(0); iZ != nBinsZ; ++iZ) {
-        for (unsigned iTheta(0); iTheta != nBinsThetaPhi; ++iTheta) {
-          for (unsigned iPhi(0); iPhi != nBinsThetaPhi; ++iPhi) {
-            auto& features(binned_features[iZ][iTheta][iPhi]);
-            features.clear();
-            
-            for (unsigned iHit(0); iHit != maxHitsPerBin; ++iHit) {
-              unsigned ibin(iZ * nBinsThetaPhi * nBinsThetaPhi + iTheta * nBinsThetaPhi + iPhi + iHit * nBins);
-            
-              features.insert(features.begin() + iHit * nFeatures, {
-                float(bin_id[ibin]),
-                bin_eta[ibin],
-                bin_theta[ibin],
-                bin_phi[ibin],
-                bin_x[ibin],
-                bin_y[ibin],
-                bin_eta_global[ibin],
-                bin_theta_global[ibin],
-                bin_phi_global[ibin],
-                bin_dist_global[ibin],
-                bin_x_global[ibin],
-                bin_y_global[ibin],
-                bin_z_global[ibin],
-                bin_energy[ibin],
-                float(bin_layer[ibin]),
-                float(bin_wafer[ibin]),
-                float(bin_wafertype[ibin])
-              });
-            }
-          }
-        }
+        bin_id[ihit][ibin] = (*tc_id)[iT];
+        bin_eta[ihit][ibin] = eta - etaBinCenter;
+        bin_theta[ihit][ibin] = theta - thetaBinCenter;
+        bin_phi[ihit][ibin] = TVector2::Phi_mpi_pi(phi - phiBinCenter);
+        bin_x[ihit][ibin] = x - xBinCenter;
+        bin_y[ihit][ibin] = y - yBinCenter;
+        bin_eta_global[ihit][ibin] = eta;
+        bin_theta_global[ihit][ibin] = theta;
+        bin_phi_global[ihit][ibin] = phi;
+        bin_dist_global[ihit][ibin] = std::sqrt(r * r + z * z);
+        bin_x_global[ihit][ibin] = x;
+        bin_y_global[ihit][ibin] = y;
+        bin_z_global[ihit][ibin] = z;
+        bin_layer[ihit][ibin] = iZ;
+        bin_energy[ihit][ibin] = (*tc_energy)[iT];
+        bin_wafer[ihit][ibin] = (*tc_wafer)[iT];
+        bin_wafertype[ihit][ibin] = (*tc_wafertype)[iT];
       }
 
       output->Fill();
@@ -581,13 +533,3 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
   output->Write();
   delete outputFile;
 }
-
-#ifdef __CLING__
-#pragma link off all globals;
-#pragma link off all classes;
-#pragma link off all functions;
-#pragma link C++ nestedclass;
-#pragma link C++ nestedtypedef;
-
-#pragma link C++ class std::vector<std::vector<std::vector<std::vector<float>>>>+;
-#endif

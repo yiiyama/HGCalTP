@@ -59,11 +59,11 @@ class TrainData_ID(TrainData):
             'bin_layer'
         ]
         branches = []
-        for icell in range(3):
+        for icell in range(2):
             branches.extend([b + ('_%d' % icell) for b in branches_template])
             
         feature_array = uproot_tree.arrays(branches, outputtype=to_ndarray)
-        feature_array = numpy.reshape(feature_array, (-1, 5, 5, 38, 42))[:,:,:,:,:28]
+        feature_array = numpy.reshape(feature_array, (-1, 5, 5, 38, 28))
 
         print("reading truth")
         #truth = self.read_truthclasses(filename)

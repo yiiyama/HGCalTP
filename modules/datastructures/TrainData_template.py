@@ -66,7 +66,6 @@ class TrainData_ID(TrainData):
         feature_array = numpy.reshape(feature_array, (-1, 5, 5, 38, 28))
 
         print("reading truth")
-        #truth = self.read_truthclasses(filename)
         truth = uproot_tree.arrays(self.truthclasses, outputtype=to_ndarray)
 
         Tuple = self.readTreeFromRootToTuple(filename)

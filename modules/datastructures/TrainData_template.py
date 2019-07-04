@@ -1,6 +1,6 @@
-
 from DeepJetCore.TrainData import TrainData, fileTimeOut
 import numpy
+import uproot
 
 class TrainData_ID(TrainData):
     def __init__(self):
@@ -31,36 +31,47 @@ class TrainData_ID(TrainData):
         #call this at the end
         self.reduceTruth(None)
 
-    #not needed, override
-    def produceBinWeighter(self, filename):
-        return self.make_empty_weighter()
-    
-    def produceMeansFromRootFile(self, orig_list, limit):
-        import numpy
-        return numpy.array([1.,])
-
-
     def readFromRootFile(self,filename,TupleMeanStd, weighter):
-
         # this function defines how to convert the root ntuple to the training format
         # options are not yet described here
 
         fileTimeOut(filename,120)
-        import ROOT
-        print("open file")
-        rfile = ROOT.TFile(filename)
-        tree = rfile.Get(self.treename)
-        print("opened tree")
-        self.nsamples=tree.GetEntries()
 
-        from DeepJetCore.preprocessing import read4DArray
+        uproot_tree = uproot.open(filename)['clusters']
 
-        # user code
-        print("reading array")
-        feature_array = read4DArray(filename,self.treename,"binned_features",self.nsamples,38,5,5,51)
+        def to_ndarray(*args):
+            return numpy.squeeze(numpy.dstack(args))
+
+        branches_template = [
+            'bin_eta',
+            'bin_theta',
+            'bin_phi',
+            'bin_x',
+            'bin_y',
+            'bin_eta_global',
+            'bin_theta_global',
+            'bin_phi_global',
+            'bin_dist_global',
+            'bin_x_global',
+            'bin_y_global',
+            'bin_z_global',
+            'bin_energy',
+            'bin_layer'
+        ]
+        branches = []
+        for icell in range(3):
+            branches.extend([b + ('_%d' % icell) for b in branches_template])
+
+        feature_array = uproot_tree.arrays(branches, outputtype=to_ndarray)
+        feature_array = numpy.reshape(feature_array, (-1, 5, 5, 38, 42))
+        #print(feature_array)
 
         print("reading truth")
-        truth = self.read_truthclasses(filename)
+        #truth = self.read_truthclasses(filename)
+        truth = uproot_tree.arrays(self.truthclasses, outputtype=to_ndarray)
+        #print(truth)
+        # for binary
+        #truth = numpy.argmax(truth, axis=1)
 
         Tuple = self.readTreeFromRootToTuple(filename)
 

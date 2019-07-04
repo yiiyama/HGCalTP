@@ -403,8 +403,8 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
 
       double thetaMin(3.2);
       double thetaMax(0.);
-      double phiMin(3.2);
-      double phiMax(-3.2);
+      double relPhiMin(3.2);
+      double relPhiMax(-3.2);
 
       std::map<double, int> sortedIndices;
       for (auto iS : constituents) {
@@ -451,15 +451,15 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
         else if (theta > thetaMax)
           thetaMax = theta;
 
-        if (relPhi < phiMin)
-          phiMin = relPhi;
-        else if (relPhi > phiMax)
-          phiMax = relPhi;
+        if (relPhi < relPhiMin)
+          relPhiMin = relPhi;
+        else if (relPhi > relPhiMax)
+          relPhiMax = relPhi;
       }
 
       // center of the bounding box
       double thetaCenter((thetaMin + thetaMax) * 0.5);
-      double phiCenter((phiMin + phiMax) * 0.5);
+      double phiCenter((relPhiMin + relPhiMax) * 0.5);
 
       for (unsigned iD(0); iD != constituents.size(); ++iD) {
         unsigned iT(cellMap.at(constituents[iD]));
@@ -475,7 +475,9 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
         if (iTheta < 0)
           continue;
 
-        int iPhi(findThetaPhiBin(TVector2::Phi_mpi_pi(phi - phiCenter)));
+        double relPhi(TVector2::Phi_mpi_pi(phi - cluster_phi));
+
+        int iPhi(findThetaPhiBin(relPhi - phiCenter));
         if (iPhi < 0)
           continue;
 
@@ -509,7 +511,7 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
         bin_id[ihit][ibin] = (*tc_id)[iT];
         bin_eta[ihit][ibin] = eta - etaBinCenter;
         bin_theta[ihit][ibin] = theta - thetaBinCenter;
-        bin_phi[ihit][ibin] = TVector2::Phi_mpi_pi(phi - phiBinCenter);
+        bin_phi[ihit][ibin] = TVector2::Phi_mpi_pi(relPhi - phiBinCenter);
         bin_x[ihit][ibin] = x - xBinCenter;
         bin_y[ihit][ibin] = y - yBinCenter;
         bin_eta_global[ihit][ibin] = eta;

@@ -1,5 +1,6 @@
 import sys
 import keras
+import tensorflow as tf
 
 sys.path.append('/afs/cern.ch/user/y/yiiyama/src/caloGraphNN')
 import caloGraphNN_keras as cgnn
@@ -33,7 +34,6 @@ class GarNetClassificationModel(keras.Model):
         feats = []
 
         x = inputs[0]
-        print(type(x))
 
         x = self.input_gex(x)
         x = self.input_batchnorm(x)
@@ -59,17 +59,35 @@ class GarNetClassificationModel(keras.Model):
 
 
 def make_garnet(inputs, n_classes, n_regressions, other_options=[], dropout_rate=0.01, momentum=0.8):
-    #return GarNetClassificationModel(n_classes, momentum=momentum)
+    x = inputs[1]
 
-    x = inputs[0]
-    print(type(x), x.shape)
+    vertex_mask = keras.layers.Lambda(lambda x: tf.cast(tf.not_equal(x[..., 9:10], 0.), tf.float32))(x)
 
-    
-    x = cgnn.GlobalExchange(name='input_gex')(x)
-    x = keras.layers.BatchNormalization(momentum=momentum, name='batchnorm_%d' % i)(x)
-    x = keras.layers.Dense(32, activation='tanh', name='input_dense')(x)
+    x = cgnn.GlobalExchange(name='input_gex', vertex_mask=vertex_mask)(x)
+    x = keras.layers.BatchNormalization(momentum=momentum, name='input_batchnorm')(x)
+    x = keras.layers.Dense(16, activation='tanh', name='input_dense')(x)
 
-    return Model(inputs=inputs, outputs=[x])
+    aggregators = [4] * 11
+    filters = [32] * 11
+    propagate = [20] * 11
+    block_params = zip(aggregators, filters, propagate)
+
+    feats = []
+
+    for i, (n_aggregators, n_filters, n_propagate) in enumerate(block_params):
+        x = cgnn.GarNet(n_aggregators, n_filters, n_propagate, name='garnet_%d' % i, vertex_mask=vertex_mask)(x)
+        x = keras.layers.BatchNormalization(momentum=momentum, name='batchnorm_%d' % i)(x)
+        x = keras.layers.Multiply()([vertex_mask, x])
+        feats.append(x)
+
+    x = keras.layers.Concatenate(axis=-1)(feats)
+
+    x = keras.layers.Lambda(lambda x: tf.reduce_mean(x, axis=1))(x)
+    print('reduced', x)
+    x = keras.layers.Dense(48, activation='relu', name='output_0')(x)
+    x = keras.layers.Dense(n_classes, activation='softmax', name='output_1')(x)
+
+    return keras.Model(inputs=inputs, outputs=[x])
 
 
 if __name__ == '__main__':

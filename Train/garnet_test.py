@@ -1,6 +1,6 @@
 import sys
 import keras
-import tensorflow as tf
+import tensorflow
 
 sys.path.append('/afs/cern.ch/user/y/yiiyama/src/caloGraphNN')
 import caloGraphNN_keras as cgnn
@@ -45,7 +45,7 @@ class GarNetClassificationModel(keras.Model):
 
             feats.append(x)
 
-        x = tf.concat(feats, axis=-1)
+        x = tensorflow.concat(feats, axis=-1)
 
         x = self.output_dense_0(x)
         x = self.output_dense_1(x)
@@ -61,7 +61,7 @@ class GarNetClassificationModel(keras.Model):
 def make_garnet(inputs, n_classes, n_regressions, other_options=[], dropout_rate=0.01, momentum=0.8):
     x = inputs[1]
 
-    vertex_mask = keras.layers.Lambda(lambda x: tf.cast(tf.not_equal(x[..., 9:10], 0.), tf.float32))(x)
+    vertex_mask = keras.layers.Lambda(lambda x: tensorflow.cast(tensorflow.not_equal(x[..., 9:10], 0.), tensorflow.float32))(x)
 
     x = cgnn.GlobalExchange(name='input_gex', vertex_mask=vertex_mask)(x)
     x = keras.layers.BatchNormalization(momentum=momentum, name='input_batchnorm')(x)
@@ -82,7 +82,7 @@ def make_garnet(inputs, n_classes, n_regressions, other_options=[], dropout_rate
 
     x = keras.layers.Concatenate(axis=-1)(feats)
 
-    x = keras.layers.Lambda(lambda x: tf.reduce_mean(x, axis=1))(x)
+    x = keras.layers.Lambda(lambda x: tensorflow.reduce_mean(x, axis=1))(x)
     print('reduced', x)
     x = keras.layers.Dense(48, activation='relu', name='output_0')(x)
     x = keras.layers.Dense(n_classes, activation='softmax', name='output_1')(x)

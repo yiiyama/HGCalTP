@@ -9,10 +9,10 @@ class TrainData_cells(TrainData):
         self.treename="clusters" #input root tree name
 
         self.truthclasses=['electron',
-                           #'muon',
-                           #'photon',
-                           #'pi0',
-                           #'neutral',
+                           'muon',
+                           'photon',
+                           'pi0',
+                           'neutral',
                            'charged'] #truth classes for classification
 
         self.weightbranchX='cluster_energy' #needs to be specified

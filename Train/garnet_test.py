@@ -1,12 +1,9 @@
 import sys
 import keras
-
-sys.path.append('/afs/cern.ch/user/y/yiiyama/src/caloGraphNN')
-
 import tensorflow as tf
 from keras import backend as K
 from keras.layers import Lambda
-
+sys.path.append('/afs/cern.ch/work/a/abgupta/deepjet2/calo2/caloGraphNN')
 import caloGraphNN_keras as cgnn
 import numpy as np
 def make_garnet(inputs, n_classes, n_regressions, other_options=[], dropout_rate=0.05, momentum=0.9):

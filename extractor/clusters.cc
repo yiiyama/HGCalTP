@@ -45,6 +45,14 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
     nCategories
   };
 
+  enum ReducedCategory {
+    lEGamma,
+    lMuon,
+    lPi0,
+    lHadron,
+    nReducedCategories
+  };
+  
   TString categories[nCategories] = {
     "electron",
     "muon",
@@ -54,8 +62,16 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
     "charged"
   };
 
+  TString reducedCategories[nReducedCategories] = {
+    "egamma",
+    "muon",
+    "pi0",
+    "hadron"
+  };
+
   // one-hot labels
   int truth_labels[nCategories];
+  int truth_labels_reduced[nReducedCategories];
 
   float cluster_pt;
   float cluster_eta;
@@ -119,6 +135,8 @@ extractNtuples(TTree* _input, char const* _outputFileName, double _minPt = 0., l
 
   for (unsigned iC(0); iC != nCategories; ++iC)
     output->Branch(categories[iC], &(truth_labels[iC]), categories[iC] + "/I");
+  for (unsigned iC(0); iC != nReducedCategories; ++iC)
+    output->Branch(reducedCategories[iC], &(truth_labels[iC]), categories[iC] + "/I");
 
   output->Branch("cluster_pt", &cluster_pt, "cluster_pt/F");
   output->Branch("cluster_eta", &cluster_eta, "cluster_eta/F");
